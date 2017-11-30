@@ -23,9 +23,6 @@ namespace NemoServer
 
         public static void Main()
         {
-            Task task = new Task(ChefListener);
-            task.Start();
-
             TcpListener server = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
             server.Start();
             Console.WriteLine("Server has started on 127.0.0.1:8080.{0}Waiting for a connection...", Environment.NewLine);
@@ -33,6 +30,9 @@ namespace NemoServer
             Console.WriteLine("A client connected.");
             stream = client.GetStream();
             //enter to an infinite cycle to be able to handle every change in stream
+
+            Task task = new Task(ChefListener);
+            task.Start();
 
             while (true)
             {
@@ -80,19 +80,54 @@ namespace NemoServer
             while(true)
             {
 
-                var orders = _orders.Where(x => x.ReadyStatus == false);
-                if (orders.Count() > 0)
+                var ordersNotReady = _orders.Where(x => x.ReadyStatus == false);
+                int orderId = 0;
+                Order order;
+
+                if (ordersNotReady != null && ordersNotReady.Count() > 0)
                 {
-                    var order = orders.First();
+                    //var order = ordersNotReady.First();
 
-                    ToClient("Preparing order id: " + _currentOrderId + ": " + order.DishName);
+                    //ToClient("Preparing order ids: " + order.OrderNumber + ": " + order.DishName);
 
-                    Console.WriteLine("Order #:" + order.OrderNumber + " " + order.DishName + " ready?");
-                    Console.ReadLine();
+                    Console.Clear();
+
+                    Console.WriteLine("Unready orders:");
+
+                    foreach (var item in ordersNotReady)
+                    {
+                        Console.WriteLine("#{0} {1}", item.OrderNumber, item.DishName);
+                    }
+
+                    Console.WriteLine("--------");
+
+                    while(true) { 
+                        try { 
+                            Console.WriteLine("Which order is ready?");
+                            orderId = int.Parse(Console.ReadLine());
+                            order = ordersNotReady.Single(x => x.OrderNumber == orderId);
+                            break;
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+                    }
+
 
                     order.ReadyStatus = true;
 
-                    ToClient("Order id: " + _currentOrderId + ": " + order.DishName + " ready.");
+                    ToClient("Order id " + order.OrderNumber + ": " + order.DishName + " ready.");
+                }
+                else
+                {
+                    Console.WriteLine("No orders in que (press enter to update):");
+                    Console.ReadLine();
+                    Console.Clear();
+
+                    Task task = new Task(ChefListener);
+                    task.Start();
+                    break;
                 }
             }
         }
@@ -124,7 +159,7 @@ namespace NemoServer
 
                 //Console.WriteLine("Order id: " + _currentOrderId + ": " + data);
                 if (data == "exit") break;
-                ToClient(data);
+                ToClient(data + " ordered.");
             }
             stream.Close();
             client.Close();
