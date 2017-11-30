@@ -110,6 +110,7 @@ namespace NemoServer
                         }
                         catch
                         {
+                            Console.WriteLine("Try again");
                             continue;
                         }
                     }
