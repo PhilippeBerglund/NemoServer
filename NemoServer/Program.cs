@@ -79,7 +79,6 @@ namespace NemoServer
         {
             while(true)
             {
-
                 var ordersNotReady = _orders.Where(x => x.ReadyStatus == false);
                 int orderId = 0;
                 Order order;
@@ -114,10 +113,7 @@ namespace NemoServer
                             continue;
                         }
                     }
-
-
                     order.ReadyStatus = true;
-
                     ToClient("Order id " + order.OrderNumber + ": " + order.DishName + " ready.");
                 }
                 else
@@ -142,7 +138,8 @@ namespace NemoServer
                 var bytes = new Byte[1024];
                 int rec = stream.Read(bytes, 0, 1024);  //Blocking
 
-                
+                //var mess = (bytes.Take(rec)).ToArray<byte>();
+
                 var length = bytes[1] - 128; //message length
                 Byte[] key = new Byte[4];
                 Array.Copy(bytes, 2, key, 0, key.Length);
@@ -160,7 +157,7 @@ namespace NemoServer
 
                 //Console.WriteLine("Order id: " + _currentOrderId + ": " + data);
                 if (data == "exit") break;
-                ToClient(data + " ordered.");
+                ToClient(data +  " order # " + _currentOrderId + " ordered");
             }
             stream.Close();
             client.Close();
