@@ -79,11 +79,8 @@ namespace NemoServer
 
         private static void ChefListener()
         {
-            Timer timer = new Timer();
-            
-            while (true)
+            while(true)
             {
-
                 var ordersNotReady = _orders.Where(x => x.ReadyStatus == false);
                 int orderId = 0;
                 Order order;
@@ -133,7 +130,6 @@ namespace NemoServer
                     }
 
                     order.ReadyStatus = true;
-
                     ToClient("Order id " + order.OrderNumber + ": " + order.DishName + " ready.");
                 }
                 else
