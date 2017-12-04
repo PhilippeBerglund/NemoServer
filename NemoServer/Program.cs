@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Timers;
 
 namespace NemoServer
 {
@@ -26,16 +27,17 @@ namespace NemoServer
             TcpListener server = new TcpListener(IPAddress.Parse("127.0.0.1"), 8080);
             server.Start();
             Console.WriteLine("Server has started on 127.0.0.1:8080.{0}Waiting for a connection...", Environment.NewLine);
-            client = server.AcceptTcpClient();
-            Console.WriteLine("A client connected.");
-            stream = client.GetStream();
-            //enter to an infinite cycle to be able to handle every change in stream
-
-            Task task = new Task(ChefListener);
-            task.Start();
 
             while (true)
             {
+                client = server.AcceptTcpClient();
+                Console.WriteLine("A client connected.");
+                stream = client.GetStream();
+                //enter to an infinite cycle to be able to handle every change in stream
+            
+                Task task = new Task(ChefListener);
+                task.Start();
+
                 while (!stream.DataAvailable) ;
                 Byte[] bytes = new Byte[client.Available];
 
@@ -50,7 +52,7 @@ namespace NemoServer
                 //}
                 if (new Regex("^GET").IsMatch(data))
                 {
-                    Console.WriteLine("OK");
+                    //Console.WriteLine("New connection established");
                     Byte[] response = Encoding.UTF8.GetBytes("HTTP/1.1 101 Switching Protocols" + Environment.NewLine
                         + "Connection: Upgrade" + Environment.NewLine
                         + "Upgrade: websocket" + Environment.NewLine
@@ -77,12 +79,15 @@ namespace NemoServer
 
         private static void ChefListener()
         {
-            while(true)
+            Timer timer = new Timer();
+            
+            while (true)
             {
 
                 var ordersNotReady = _orders.Where(x => x.ReadyStatus == false);
                 int orderId = 0;
                 Order order;
+                var update = false;
 
                 if (ordersNotReady != null && ordersNotReady.Count() > 0)
                 {
@@ -103,18 +108,29 @@ namespace NemoServer
 
                     while(true) { 
                         try { 
-                            Console.WriteLine("Which order is ready?");
-                            orderId = int.Parse(Console.ReadLine());
+                            Console.WriteLine("Which order is ready? (u=update)");
+                            var input = Console.ReadLine();
+                            if(input == "u")
+                            {
+                                order = null;
+                                update = true;
+                                break;
+                            }
+                            orderId = Convert.ToInt32(input);
                             order = ordersNotReady.Single(x => x.OrderNumber == orderId);
                             break;
                         }
-                        catch
+                        catch (Exception e)
                         {
                             Console.WriteLine("Try again");
                             continue;
                         }
                     }
 
+                    if(update)
+                    {
+                        continue;
+                    }
 
                     order.ReadyStatus = true;
 
@@ -123,7 +139,7 @@ namespace NemoServer
                 else
                 {
                     Console.WriteLine("No orders in que (press enter to update):");
-                    Console.ReadLine();
+                    Console.ReadKey();
                     Console.Clear();
 
                     Task task = new Task(ChefListener);
@@ -140,9 +156,15 @@ namespace NemoServer
             {
                 // Console.WriteLine("FromClien");
                 var bytes = new Byte[1024];
-                int rec = stream.Read(bytes, 0, 1024);  //Blocking
 
-                
+                try { 
+                    int rec = stream.Read(bytes, 0, 1024);  //Blocking
+                }
+                catch(Exception e)
+                {
+                    break;
+                }
+
                 var length = bytes[1] - 128; //message length
                 Byte[] key = new Byte[4];
                 Array.Copy(bytes, 2, key, 0, key.Length);
@@ -155,12 +177,19 @@ namespace NemoServer
                 }
                 var data = Encoding.UTF8.GetString(decoded);
 
+                if (data == "" || data.StartsWith("\u0003"))
+                    break;
+
+                
+
                 _currentOrderId++;
                 _orders.Add(new Order { OrderNumber = _currentOrderId, DishName = data });
 
                 //Console.WriteLine("Order id: " + _currentOrderId + ": " + data);
                 if (data == "exit") break;
-                ToClient(data + " ordered.");
+                if(!string.IsNullOrEmpty(data)) { 
+                    ToClient(data + " ordered. Your #:" + _currentOrderId);
+                }
             }
             stream.Close();
             client.Close();
